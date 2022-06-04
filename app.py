@@ -1,7 +1,7 @@
 import sys
 from PyQt5.QtWidgets import QApplication 
 
-from gui import MyApp;
+from ui import MyApp;
 
 
 

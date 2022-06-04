@@ -2,11 +2,37 @@ import time
 import pandas as pd
 from docx import Document;
 from PyQt5.QtWidgets import *
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QObject, QThread, pyqtSignal
 
 from core import make_blank
 
+from time import sleep
+
 args = {}
+
+class Worker(QObject):
+    finished = pyqtSignal()
+
+    def __init__(self, parent):
+        super().__init__()
+        self.parent = parent;
+
+    def run(self):
+        global args
+        doc = Document()
+        table = doc.add_table(rows=1, cols=3)
+        table.style = doc.styles['Table Grid']
+        header = table.rows[0].cells
+        header[0].text = "문제"
+        header[1].text = "답변"
+        header[2].text = "정답"
+        for row in args['csv_data'].itertuples():
+            target_row = table.add_row().cells
+            target_row[0].text = row[1]
+            target_row[1].text = make_blank(row[2], not args['nj'], self.parent.percentSlider.value()*0.1)
+            target_row[2].text = row[2]
+        doc.save(args['output_path']); 
+        self.finished.emit()
 
 class TableWidget(QTableWidget):
     def __init__(self):
@@ -135,7 +161,17 @@ class MyApp(QWidget):
     
     def runEvent(self):
         QMessageBox.about(self, "실행", '파일 생성 중입니다.')
+        startTime = time.time()
         self.saveEvent();
+        self.thread = QThread()
+        self.worker = Worker(self)
+        self.worker.moveToThread(self.thread)
+        self.thread.started.connect(self.worker.run)
+        self.worker.finished.connect(self.thread.quit)
+        self.worker.finished.connect(self.worker.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+        self.thread.start()
+        '''
         global args
         startTime = time.time()
         doc = Document()
@@ -152,9 +188,13 @@ class MyApp(QWidget):
             target_row[2].text = row[2]
 
         doc.save(args['output_path']);
-        QMessageBox.about(self, "실행", 'time elapsed: '+str(time.time()-startTime)+'\n'+args['output_path'])
-        
+        '''
+        def win():
+            QMessageBox.about(self, "실행", 'time elapsed: '+str(time.time()-startTime)+'\n'+args['output_path'])
+
+        self.thread.finished.connect(win)
     
+        
     def changeJosa(self):
         global args
         args['nj'] = not args['nj']
